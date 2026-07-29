@@ -64,6 +64,12 @@ const SECURITY_HEADERS = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  // Traces the minimal `.next/standalone` server + deps needed to run
+  // `node server.js` without a full `node_modules` install — what the
+  // Dockerfile's runner stage copies in. No effect on `next dev` or on
+  // the Hostinger deploy path (which uses `next start`).
+  output: "standalone",
+
   /**
    * Cross-origin dev access (Next.js 16).
    *
