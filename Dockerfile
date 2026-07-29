@@ -12,7 +12,14 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# `npm ci` demands the lockfile exactly match package.json's resolved
+# tree, including OS-specific optional/peer deps (e.g. @swc/helpers
+# behind next-intl's swc plugin). A lockfile committed from a Windows
+# dev machine can omit entries only Linux resolution needs, which
+# fails `ci` here even though it's a false positive on Windows.
+# `install` re-resolves for this platform instead of demanding an
+# exact match.
+RUN npm install --no-audit --no-fund
 
 # ============================================================
 # 2. builder — compile the Next.js app.
