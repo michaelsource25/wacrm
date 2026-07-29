@@ -13,6 +13,10 @@ import type { AiProvider } from './types'
 export const AI_PROVIDER_DEFAULT_MODEL: Record<AiProvider, string> = {
   openai: 'gpt-5.4-mini',
   anthropic: 'claude-haiku-4-5-20251001',
+  // OpenRouter model IDs are namespaced `vendor/model` — it proxies to
+  // whichever backend the customer picks, so this is only a starting
+  // point (see https://openrouter.ai/models for the full catalog).
+  openrouter: 'openai/gpt-5.4-mini',
 }
 
 /**
