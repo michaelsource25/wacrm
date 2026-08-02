@@ -79,6 +79,18 @@ export function serializeConversation(conv: Conversation): ApiConversation {
   };
 }
 
+/**
+ * The dashboard stores `media_url` as the session-gated proxy path
+ * (`/api/whatsapp/media/{id}`, set by the webhook handler for the inbox
+ * UI's own use). Public API callers authenticate with an API key, not a
+ * browser session, so that path 401s for them — rewrite it to the
+ * API-key-gated twin (`/api/v1/media/{id}`) before it goes on the wire.
+ */
+function toPublicMediaUrl(mediaUrl: string | null | undefined): string | null {
+  if (!mediaUrl) return null;
+  return mediaUrl.replace(/^\/api\/whatsapp\/media\//, '/api/v1/media/');
+}
+
 /** Project a `messages` row into the public shape. */
 export function serializeMessage(m: Message): ApiMessage {
   return {
@@ -89,7 +101,7 @@ export function serializeMessage(m: Message): ApiMessage {
     sender_type: m.sender_type,
     content_type: m.content_type,
     content_text: m.content_text ?? null,
-    media_url: m.media_url ?? null,
+    media_url: toPublicMediaUrl(m.media_url),
     template_name: m.template_name ?? null,
     whatsapp_message_id: m.message_id ?? null,
     status: m.status,
