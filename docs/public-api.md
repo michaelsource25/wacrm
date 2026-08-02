@@ -219,6 +219,21 @@ Paginated. Each message includes its `direction` (`inbound` /
 `content_*`. The conversation is verified to belong to your account
 first (`404` otherwise).
 
+### `GET /api/v1/media/{mediaId}`
+
+Download a message attachment's raw bytes (voice note, image,
+document, …). Scope: `messages:read`. `mediaId` is the id embedded in
+a message's `media_url` (`/api/whatsapp/media/{mediaId}`) from the
+endpoint above. Returns the binary with a matching `Content-Type` —
+not the JSON envelope. `400 whatsapp_not_configured`-style errors use
+the standard envelope.
+
+```bash
+curl https://your-crm.example.com/api/v1/media/<mediaId> \
+  -H "Authorization: Bearer wacrm_live_xxx" \
+  -o voice-note.ogg
+```
+
 ### `POST /api/v1/broadcasts`
 
 Launch a template broadcast to a list of recipients. Scope:
