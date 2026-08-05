@@ -378,6 +378,57 @@ export interface Deal {
   assignee?: Profile;
 }
 
+// ============================================================
+// Appointments (migration 038)
+// ============================================================
+
+export type AppointmentStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'cancelled'
+  | 'completed'
+  | 'no_show';
+
+export interface Service {
+  id: string;
+  account_id: string;
+  name: string;
+  duration_minutes: number;
+  price?: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Weekly opening-hours window. weekday: 0 = Sunday … 6 = Saturday. */
+export interface AvailabilityRule {
+  id: string;
+  account_id: string;
+  weekday: number;
+  start_time: string; // "HH:MM:SS"
+  end_time: string;
+  created_at: string;
+}
+
+export interface Appointment {
+  id: string;
+  account_id: string;
+  /** NULL when the referenced contact was deleted (history preserved). */
+  contact_id: string | null;
+  service_id: string | null;
+  /** Denormalized at booking time; survives service rename/delete. */
+  service_name: string | null;
+  starts_at: string;
+  ends_at: string;
+  status: AppointmentStatus;
+  notes?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Hydrated by queries that embed `contact:contacts(...)`. */
+  contact?: Pick<Contact, 'id' | 'name' | 'phone'> | null;
+}
+
 export type BroadcastStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
 export type RecipientStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'replied' | 'failed';
 

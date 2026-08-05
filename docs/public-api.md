@@ -50,6 +50,8 @@ it. Grant the minimum.
 | `conversations:read` | List and read conversations              |
 | `broadcasts:send`    | Launch broadcast campaigns               |
 | `webhooks:manage`    | Register and manage outbound webhooks    |
+| `appointments:read`  | Read appointments and availability       |
+| `appointments:write` | Book, reschedule, and cancel appointments |
 
 A key with **no scopes** still authenticates and can call
 `GET /api/v1/me` — useful for verifying a key works.
@@ -277,6 +279,81 @@ Invalid phone numbers are dropped and counted as `rejected`. Response
 Broadcast status + counts. Scope: `broadcasts:send`. `status` moves
 `sending` → `sent`; `delivered_count` / `read_count` keep climbing as
 Meta delivery webhooks arrive. `404` for another account's broadcast.
+
+### `GET /api/v1/availability`
+
+Free booking slots for a local date. Scope: `appointments:read`.
+**Migration required:** apply `supabase/migrations/038_appointments.sql`.
+
+Query params: `date` (required, `YYYY-MM-DD`, the business's local
+date), `service_id` (optional — slot length becomes that service's
+duration), `duration` (optional minutes, default 30), and `tz_offset`
+(optional; minutes to **add to UTC** to get local time — e.g. `-240`
+for Santo Domingo; default 0).
+
+Opening hours come from the account's `availability_rules` rows; an
+account with none falls back to Mon–Sat 09:00–18:00 so booking works
+out of the box. Slots already past, or overlapping a non-cancelled
+appointment, are excluded.
+
+```bash
+curl "https://your-crm.example.com/api/v1/availability?date=2026-08-06&tz_offset=-240" \
+  -H "Authorization: Bearer wacrm_live_xxx"
+```
+
+```json
+{
+  "data": {
+    "date": "2026-08-06",
+    "duration_minutes": 30,
+    "slots": [
+      { "starts_at": "2026-08-06T13:00:00.000Z", "local_time": "09:00" },
+      { "starts_at": "2026-08-06T13:30:00.000Z", "local_time": "09:30" }
+    ]
+  }
+}
+```
+
+### `GET /api/v1/appointments`
+
+List appointments, soonest first. Scope: `appointments:read`.
+Filters: `?from=` / `?to=` (ISO datetimes bounding `starts_at`),
+`?status=`, `?contact_id=`, `?limit=` (default 100, max 200). Each
+appointment embeds its contact (`id`, `phone`, `name`).
+
+### `POST /api/v1/appointments`
+
+Book an appointment. Scope: `appointments:write`. Like
+`POST /api/v1/messages`, you pass a phone (`to`) and the contact is
+found-or-created — or pass `contact_id` directly.
+
+```bash
+curl -X POST https://your-crm.example.com/api/v1/appointments \
+  -H "Authorization: Bearer wacrm_live_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "to": "+18095550123",
+        "name": "Jane Doe",
+        "starts_at": "2026-08-06T19:00:00Z",
+        "service_name": "Corte + barba",
+        "duration_minutes": 45,
+        "notes": "booked by the WhatsApp bot"
+      }'
+```
+
+`service_id` (optional) pins a configured service and defaults the
+duration; `status` may be `pending` or `confirmed` (default). A time
+conflict returns **409 `slot_taken`** — re-query
+`/api/v1/availability` and offer new times.
+
+### `GET` / `PATCH /api/v1/appointments/{id}`
+
+Read or update one appointment. Scopes: `appointments:read` /
+`appointments:write`. `PATCH` updates only the fields you send:
+`starts_at` + `duration_minutes` reschedule (the overlap check re-runs,
+excluding this appointment), `status` moves through
+`pending | confirmed | cancelled | completed | no_show`, and `notes` /
+`service_name` are free-text. A foreign id returns `404`.
 
 ## Pagination
 

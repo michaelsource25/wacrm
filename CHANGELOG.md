@@ -9,6 +9,32 @@ Versions follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0, `MINOR` bumps cover new modules; `PATCH` bumps cover bug fixes
 and polish.
 
+## [0.9.0] — 2026-08-04
+
+Native appointments: a calendar module so a WhatsApp bot (or a human)
+can book, confirm, and track visits without leaving the CRM.
+
+> **Migration required:** apply `supabase/migrations/038_appointments.sql`
+> (adds `services`, `availability_rules`, and `appointments` tables
+> with account-scoped RLS).
+
+### Added
+
+- **Appointments module.** New `/appointments` page with a weekly
+  calendar — appointments colored by status (confirmed / pending /
+  cancelled / completed / no-show), click-to-book on empty slots, a
+  contact picker, and per-account bookable services (name, duration,
+  price) managed inline by admins. Sidebar gains a "Appointments"
+  entry.
+- **Public API: scheduling.** `GET /api/v1/availability` computes free
+  slots from the account's weekly opening hours (defaults to Mon–Sat
+  9–18 when unconfigured); `GET/POST /api/v1/appointments` lists and
+  books (find-or-create by phone, `409 slot_taken` on conflicts);
+  `GET/PATCH /api/v1/appointments/{id}` reads, reschedules, and moves
+  status. Two new API-key scopes: `appointments:read` and
+  `appointments:write` — an external bot (n8n, etc.) can now offer
+  real slots and book them.
+
 ## [0.8.1] — 2026-07-10
 
 Fixes inbound chats fragmenting into multiple threads for the same

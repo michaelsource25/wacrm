@@ -21,6 +21,7 @@
     "notifications": "Notifications",
     "contacts": "Contacts",
     "pipelines": "Pipelines",
+    "appointments": "Appointments",
     "broadcasts": "Broadcasts",
     "automations": "Automations",
     "flows": "Flows",
@@ -46,6 +47,7 @@
     "notifications": "Notifications",
     "contacts": "Contacts",
     "pipelines": "Pipelines",
+    "appointments": "Appointments",
     "broadcasts": "Broadcasts",
     "automations": "Automations",
     "settings": "Settings",
@@ -59,6 +61,57 @@
   },
   "ModeToggle": {
     "switchMode": "Switch to {mode} mode"
+  },
+  "Appointments": {
+    "title": "Appointments",
+    "today": "Today",
+    "todayBadge": "today",
+    "prevWeek": "Previous week",
+    "nextWeek": "Next week",
+    "newAppointment": "New appointment",
+    "services": "Services",
+    "noServices": "No services yet — add the first one below.",
+    "serviceName": "Service name",
+    "price": "Price",
+    "addService": "Add service",
+    "contact": "Contact",
+    "searchContact": "Search by name or phone…",
+    "change": "Change",
+    "service": "Service",
+    "noService": "No service",
+    "date": "Date",
+    "time": "Time",
+    "duration": "Minutes",
+    "notes": "Notes",
+    "cancel": "Cancel",
+    "create": "Create",
+    "saving": "Saving…",
+    "statusLabel": "Status",
+    "status": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled",
+      "completed": "Completed",
+      "no_show": "No-show"
+    },
+    "actions": {
+      "confirm": "Confirm",
+      "complete": "Completed",
+      "noShow": "No-show",
+      "cancel": "Cancel appointment",
+      "delete": "Delete"
+    },
+    "toasts": {
+      "created": "Appointment created",
+      "updated": "Appointment updated",
+      "deleted": "Appointment deleted",
+      "createFailed": "Could not create the appointment",
+      "updateFailed": "Could not update the appointment",
+      "deleteFailed": "Could not delete the appointment",
+      "serviceFailed": "Could not save the service",
+      "slotTaken": "That time overlaps another appointment",
+      "invalidDate": "Enter a valid date and time"
+    }
   },
   "Dashboard": {
     "page": {

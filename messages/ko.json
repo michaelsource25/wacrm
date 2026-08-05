@@ -21,6 +21,7 @@
     "notifications": "알림",
     "contacts": "연락처",
     "pipelines": "파이프라인",
+    "appointments": "예약",
     "broadcasts": "브로드캐스트",
     "automations": "자동화",
     "flows": "플로우",
@@ -46,6 +47,7 @@
     "notifications": "알림",
     "contacts": "연락처",
     "pipelines": "파이프라인",
+    "appointments": "예약",
     "broadcasts": "브로드캐스트",
     "automations": "자동화",
     "settings": "설정",
@@ -59,6 +61,57 @@
   },
   "ModeToggle": {
     "switchMode": "{mode} 모드로 전환"
+  },
+  "Appointments": {
+    "title": "예약",
+    "today": "오늘",
+    "todayBadge": "오늘",
+    "prevWeek": "이전 주",
+    "nextWeek": "다음 주",
+    "newAppointment": "새 예약",
+    "services": "서비스",
+    "noServices": "서비스가 아직 없습니다. 아래에서 추가하세요.",
+    "serviceName": "서비스 이름",
+    "price": "가격",
+    "addService": "서비스 추가",
+    "contact": "연락처",
+    "searchContact": "이름 또는 전화번호로 검색…",
+    "change": "변경",
+    "service": "서비스",
+    "noService": "서비스 없음",
+    "date": "날짜",
+    "time": "시간",
+    "duration": "분",
+    "notes": "메모",
+    "cancel": "취소",
+    "create": "생성",
+    "saving": "저장 중…",
+    "statusLabel": "상태",
+    "status": {
+      "pending": "대기 중",
+      "confirmed": "확정",
+      "cancelled": "취소됨",
+      "completed": "완료",
+      "no_show": "노쇼"
+    },
+    "actions": {
+      "confirm": "확정",
+      "complete": "완료",
+      "noShow": "노쇼",
+      "cancel": "예약 취소",
+      "delete": "삭제"
+    },
+    "toasts": {
+      "created": "예약이 생성되었습니다",
+      "updated": "예약이 업데이트되었습니다",
+      "deleted": "예약이 삭제되었습니다",
+      "createFailed": "예약을 생성할 수 없습니다",
+      "updateFailed": "예약을 업데이트할 수 없습니다",
+      "deleteFailed": "예약을 삭제할 수 없습니다",
+      "serviceFailed": "서비스를 저장할 수 없습니다",
+      "slotTaken": "해당 시간은 다른 예약과 겹칩니다",
+      "invalidDate": "유효한 날짜와 시간을 입력하세요"
+    }
   },
   "Dashboard": {
     "page": {
