@@ -34,6 +34,15 @@ export async function buildConversationContext(
   const rows = ((data ?? []) as DbMessage[]).reverse()
   return rows
     .filter((m) => m.content_text && m.content_text.trim())
+    // Drop past assistant turns that contain leaked tool syntax (a
+    // weak model once wrote its tool call as text and it got sent):
+    // left in context, the model reads its own garbage as "how I
+    // reply here" and imitates it forever.
+    .filter(
+      (m) =>
+        m.sender_type === 'customer' ||
+        !/tool_code|default_api/i.test(m.content_text!),
+    )
     .map((m) => ({
       role: m.sender_type === 'customer' ? 'user' : 'assistant',
       content: m.content_text!.trim(),
