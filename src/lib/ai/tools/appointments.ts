@@ -434,10 +434,10 @@ export async function buildAppointmentTools(
       : `(No named services — book generic ${DEFAULT_DURATION_MIN}-minute appointments.)`
 
   const prompt = [
-    'Appointment booking: this business takes appointments, and you can manage them for THIS customer with the provided tools (appointments are always the customer\'s own — never for anyone else).',
+    'Background capability — appointments. This business can take appointments, and you have tools to manage them for THIS customer (always the customer\'s own — never for anyone else). This is a silent background capability, NOT the topic of the conversation: NEVER bring up appointments, availability, times, or booking on your own. Only engage it when the customer\'s LATEST message asks about booking, changing, or cancelling an appointment. For everything else, follow the business context and instructions as if this capability did not exist, and do not revive earlier appointment talk from the history.',
     `Current local date and time for the business: ${nowLocal}${timezone ? ` (${timezone})` : ' (UTC)'}. Use it to resolve relative dates like "tomorrow". All times you mention to the customer are in this local time.`,
     `Services offered:\n${serviceLines}`,
-    'Protocol: check_availability before proposing times, and only offer times it returned. Book only after the customer explicitly confirms one specific date and time, then confirm it back to them. If they ask to cancel or move an appointment, use list_my_appointments first, then cancel_appointment or reschedule_appointment. If a tool returns an error, do not pretend it succeeded — tell the customer honestly or hand off.',
+    'When (and only when) the customer asks about appointments: check_availability before proposing times, and only offer times it returned — never state or invent availability without calling it. Book only after the customer explicitly confirms one specific date and time, then confirm it back to them. If they ask to cancel or move an appointment, use list_my_appointments first, then cancel_appointment or reschedule_appointment. If a tool returns an error, do not pretend it succeeded — tell the customer honestly.',
     'Invoke tools ONLY through the native tool-calling mechanism. NEVER write tool names, function-call syntax, code, or anything like "tool_code" in your reply text — the customer sees your text verbatim and must never see tool machinery.',
   ].join('\n')
 
