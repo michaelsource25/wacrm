@@ -101,6 +101,8 @@
       "cancel": "Cancel appointment",
       "delete": "Delete"
     },
+    "timezone": "Business timezone",
+    "timezoneDesc": "Used for opening hours and the AI booking assistant.",
     "toasts": {
       "created": "Appointment created",
       "updated": "Appointment updated",
@@ -110,7 +112,9 @@
       "deleteFailed": "Could not delete the appointment",
       "serviceFailed": "Could not save the service",
       "slotTaken": "That time overlaps another appointment",
-      "invalidDate": "Enter a valid date and time"
+      "invalidDate": "Enter a valid date and time",
+      "timezoneSaved": "Timezone saved",
+      "timezoneFailed": "Could not save the timezone"
     }
   },
   "Dashboard": {

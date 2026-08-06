@@ -1,17 +1,19 @@
 import { AiError, type ProviderResult } from '../types'
 import { MAX_OUTPUT_TOKENS } from '../defaults'
 import {
-  mergeConsecutive,
   normalizeUsage,
+  parseOpenAiToolCalls,
   providerHttpError,
   toNetworkError,
+  toOpenAiMessages,
+  toOpenAiTools,
   type ProviderArgs,
 } from './shared'
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions'
 
 interface OpenAiResponse {
-  choices?: { message?: { content?: string } }[]
+  choices?: { message?: { content?: string | null; tool_calls?: unknown } }[]
   usage?: {
     prompt_tokens?: number
     completion_tokens?: number
@@ -21,11 +23,11 @@ interface OpenAiResponse {
 
 /**
  * Call OpenAI's Chat Completions endpoint with the caller's own key.
- * Returns the raw assistant text + token usage (handoff parsing happens
- * in `generateReply`).
+ * Returns the raw assistant text, any requested tool calls, and token
+ * usage (handoff parsing and the tool loop live in `generateReply`).
  */
 export async function generateOpenAi(args: ProviderArgs): Promise<ProviderResult> {
-  const { apiKey, model, systemPrompt, messages, timeoutMs } = args
+  const { apiKey, model, systemPrompt, messages, timeoutMs, tools } = args
 
   let res: Response
   try {
@@ -37,11 +39,9 @@ export async function generateOpenAi(args: ProviderArgs): Promise<ProviderResult
       },
       body: JSON.stringify({
         model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...mergeConsecutive(messages),
-        ],
+        messages: toOpenAiMessages(systemPrompt, messages),
         max_completion_tokens: MAX_OUTPUT_TOKENS,
+        ...(tools && tools.length > 0 ? { tools: toOpenAiTools(tools) } : {}),
       }),
       signal: AbortSignal.timeout(timeoutMs),
     })
@@ -54,8 +54,10 @@ export async function generateOpenAi(args: ProviderArgs): Promise<ProviderResult
   }
 
   const data = (await res.json().catch(() => null)) as OpenAiResponse | null
-  const text = data?.choices?.[0]?.message?.content
-  if (!text || typeof text !== 'string' || !text.trim()) {
+  const message = data?.choices?.[0]?.message
+  const text = typeof message?.content === 'string' ? message.content.trim() : ''
+  const toolCalls = parseOpenAiToolCalls(message?.tool_calls)
+  if (!text && toolCalls.length === 0) {
     throw new AiError('OpenAI returned an empty response.', {
       code: 'empty_response',
     })
@@ -65,5 +67,5 @@ export async function generateOpenAi(args: ProviderArgs): Promise<ProviderResult
     completion: data?.usage?.completion_tokens,
     total: data?.usage?.total_tokens,
   })
-  return { text, usage }
+  return { text, toolCalls, usage }
 }

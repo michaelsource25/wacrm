@@ -101,6 +101,8 @@
       "cancel": "예약 취소",
       "delete": "삭제"
     },
+    "timezone": "비즈니스 시간대",
+    "timezoneDesc": "영업시간과 AI 예약 어시스턴트에 사용됩니다.",
     "toasts": {
       "created": "예약이 생성되었습니다",
       "updated": "예약이 업데이트되었습니다",
@@ -110,7 +112,9 @@
       "deleteFailed": "예약을 삭제할 수 없습니다",
       "serviceFailed": "서비스를 저장할 수 없습니다",
       "slotTaken": "해당 시간은 다른 예약과 겹칩니다",
-      "invalidDate": "유효한 날짜와 시간을 입력하세요"
+      "invalidDate": "유효한 날짜와 시간을 입력하세요",
+      "timezoneSaved": "시간대가 저장되었습니다",
+      "timezoneFailed": "시간대를 저장할 수 없습니다"
     }
   },
   "Dashboard": {

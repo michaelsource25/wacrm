@@ -4,6 +4,7 @@ import { buildConversationContext } from './context'
 import { retrieveKnowledge } from './knowledge'
 import { generateReply } from './generate'
 import { buildSystemPrompt } from './defaults'
+import { buildAppointmentTools } from './tools/appointments'
 import { buildHandoffSummary } from './handoff'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
@@ -98,24 +99,31 @@ export async function dispatchInboundToAiReply(
       return
     }
 
-    // Ground the reply in the account's knowledge base (best-effort).
-    const knowledge = await retrieveKnowledge(
-      db,
-      accountId,
-      config,
-      latestUserMessage(messages),
-    )
+    // Ground the reply in the account's knowledge base (best-effort),
+    // and load pluggable bot capabilities. Appointment tools appear
+    // only when the account actually uses the appointments module —
+    // a booking failure must not silence the whole bot, so it
+    // degrades to a plain reply.
+    const [knowledge, booking] = await Promise.all([
+      retrieveKnowledge(db, accountId, config, latestUserMessage(messages)),
+      buildAppointmentTools(db, { accountId, contactId }).catch((err) => {
+        console.error('[ai auto-reply] appointment tools unavailable:', err)
+        return null
+      }),
+    ])
 
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
       mode: 'auto_reply',
       knowledge,
+      capabilities: booking ? [booking.prompt] : undefined,
     })
 
     const { text, handoff, usage } = await generateReply({
       config,
       systemPrompt,
       messages,
+      tools: booking?.tools,
     })
 
     // Record token spend on the account's BYO key. Fire-and-forget so it

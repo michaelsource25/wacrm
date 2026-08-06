@@ -1,17 +1,19 @@
 import { AiError, type ProviderResult } from '../types'
 import { MAX_OUTPUT_TOKENS } from '../defaults'
 import {
-  mergeConsecutive,
   normalizeUsage,
+  parseOpenAiToolCalls,
   providerHttpError,
   toNetworkError,
+  toOpenAiMessages,
+  toOpenAiTools,
   type ProviderArgs,
 } from './shared'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
 interface OpenRouterResponse {
-  choices?: { message?: { content?: string } }[]
+  choices?: { message?: { content?: string | null; tool_calls?: unknown } }[]
   usage?: {
     prompt_tokens?: number
     completion_tokens?: number
@@ -25,10 +27,11 @@ interface OpenRouterResponse {
  * (`vendor/model` IDs) behind one key, so this mirrors the OpenAI adapter
  * almost exactly — `max_tokens` rather than `max_completion_tokens`,
  * since that's the field OpenRouter documents and translates for every
- * backend model, not just OpenAI's own.
+ * backend model, not just OpenAI's own. Tool calls use the same wire
+ * shape as OpenAI (OpenRouter translates for non-OpenAI backends).
  */
 export async function generateOpenRouter(args: ProviderArgs): Promise<ProviderResult> {
-  const { apiKey, model, systemPrompt, messages, timeoutMs } = args
+  const { apiKey, model, systemPrompt, messages, timeoutMs, tools } = args
 
   let res: Response
   try {
@@ -40,11 +43,9 @@ export async function generateOpenRouter(args: ProviderArgs): Promise<ProviderRe
       },
       body: JSON.stringify({
         model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...mergeConsecutive(messages),
-        ],
+        messages: toOpenAiMessages(systemPrompt, messages),
         max_tokens: MAX_OUTPUT_TOKENS,
+        ...(tools && tools.length > 0 ? { tools: toOpenAiTools(tools) } : {}),
       }),
       signal: AbortSignal.timeout(timeoutMs),
     })
@@ -57,8 +58,10 @@ export async function generateOpenRouter(args: ProviderArgs): Promise<ProviderRe
   }
 
   const data = (await res.json().catch(() => null)) as OpenRouterResponse | null
-  const text = data?.choices?.[0]?.message?.content
-  if (!text || typeof text !== 'string' || !text.trim()) {
+  const message = data?.choices?.[0]?.message
+  const text = typeof message?.content === 'string' ? message.content.trim() : ''
+  const toolCalls = parseOpenAiToolCalls(message?.tool_calls)
+  if (!text && toolCalls.length === 0) {
     throw new AiError('OpenRouter returned an empty response.', {
       code: 'empty_response',
     })
@@ -68,5 +71,5 @@ export async function generateOpenRouter(args: ProviderArgs): Promise<ProviderRe
     completion: data?.usage?.completion_tokens,
     total: data?.usage?.total_tokens,
   })
-  return { text, usage }
+  return { text, toolCalls, usage }
 }

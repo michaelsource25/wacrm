@@ -1,4 +1,11 @@
-import { AiError, type AiUsage, type ChatMessage } from '../types'
+import {
+  AiError,
+  isPlainChat,
+  type AiUsage,
+  type ProviderMessage,
+  type ToolCall,
+  type ToolDef,
+} from '../types'
 
 // ============================================================
 // Bits shared by the OpenAI + Anthropic adapters.
@@ -8,8 +15,10 @@ export interface ProviderArgs {
   apiKey: string
   model: string
   systemPrompt: string
-  messages: ChatMessage[]
+  messages: ProviderMessage[]
   timeoutMs: number
+  /** Tool declarations for this call; omit for plain text generation. */
+  tools?: ToolDef[]
 }
 
 /**
@@ -91,19 +100,89 @@ export async function providerHttpError(
 }
 
 /**
- * Collapse consecutive same-role turns into one (joined with blank
- * lines). Anthropic requires strictly alternating roles; merging is
- * also harmless for OpenAI and keeps the transcript compact.
+ * Collapse consecutive same-role plain-text turns into one (joined with
+ * blank lines). Anthropic requires strictly alternating roles; merging
+ * is also harmless for OpenAI and keeps the transcript compact. Tool
+ * turns (assistant tool-calls / tool results) are never merged — they
+ * carry structure the providers need intact.
  */
-export function mergeConsecutive(messages: ChatMessage[]): ChatMessage[] {
-  const out: ChatMessage[] = []
+export function mergeConsecutive(messages: ProviderMessage[]): ProviderMessage[] {
+  const out: ProviderMessage[] = []
   for (const m of messages) {
     const last = out[out.length - 1]
-    if (last && last.role === m.role) {
+    if (
+      last &&
+      isPlainChat(last) &&
+      isPlainChat(m) &&
+      last.role === m.role
+    ) {
       last.content = `${last.content}\n\n${m.content}`
+    } else {
+      out.push(isPlainChat(m) ? { role: m.role, content: m.content } : m)
+    }
+  }
+  return out
+}
+
+// ------------------------------------------------------------
+// OpenAI-style Chat Completions mapping, shared by the OpenAI and
+// OpenRouter adapters (OpenRouter is wire-compatible).
+// ------------------------------------------------------------
+
+interface OpenAiWireToolCall {
+  id?: string
+  function?: { name?: string; arguments?: string }
+}
+
+/** Map our neutral turns to Chat Completions `messages` entries. */
+export function toOpenAiMessages(
+  systemPrompt: string,
+  messages: ProviderMessage[],
+): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [
+    { role: 'system', content: systemPrompt },
+  ]
+  for (const m of mergeConsecutive(messages)) {
+    if (m.role === 'tool') {
+      out.push({ role: 'tool', tool_call_id: m.toolCallId, content: m.content })
+    } else if ('toolCalls' in m) {
+      out.push({
+        role: 'assistant',
+        content: m.content || null,
+        tool_calls: m.toolCalls.map((c) => ({
+          id: c.id,
+          type: 'function',
+          function: { name: c.name, arguments: c.arguments },
+        })),
+      })
     } else {
       out.push({ role: m.role, content: m.content })
     }
+  }
+  return out
+}
+
+/** Map tool declarations to Chat Completions `tools` entries. */
+export function toOpenAiTools(tools: ToolDef[]): Record<string, unknown>[] {
+  return tools.map((t) => ({
+    type: 'function',
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters,
+    },
+  }))
+}
+
+/** Parse `tool_calls` off a Chat Completions choice message, tolerant
+ *  of partial entries (skipped rather than crashing the reply path). */
+export function parseOpenAiToolCalls(raw: unknown): ToolCall[] {
+  if (!Array.isArray(raw)) return []
+  const out: ToolCall[] = []
+  for (const c of raw as OpenAiWireToolCall[]) {
+    const name = c?.function?.name
+    if (!c?.id || !name) continue
+    out.push({ id: c.id, name, arguments: c.function?.arguments ?? '{}' })
   }
   return out
 }

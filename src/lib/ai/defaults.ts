@@ -58,8 +58,11 @@ export function buildSystemPrompt(args: {
   mode: 'draft' | 'auto_reply'
   /** Knowledge-base excerpts retrieved for the current question. */
   knowledge?: string[]
+  /** Prompt fragments contributed by active bot capabilities (e.g.
+   *  appointment booking) — appended after the fixed scaffold. */
+  capabilities?: string[]
 }): string {
-  const { userPrompt, mode, knowledge } = args
+  const { userPrompt, mode, knowledge, capabilities } = args
   const parts: string[] = [
     'You are a customer-messaging assistant for a business that uses a WhatsApp CRM. ' +
       'You are shown the recent WhatsApp conversation between the business (assistant) and a customer (user). ' +
@@ -74,6 +77,12 @@ export function buildSystemPrompt(args: {
     parts.push(
       `You are replying automatically with no human in the loop. If you cannot confidently and safely help — the customer explicitly asks for a human, is upset or complaining, or the request needs information you do not have — reply with exactly ${HANDOFF_SENTINEL} and nothing else. A human agent will then take over. Prefer handing off over guessing.`,
     )
+  }
+
+  if (capabilities) {
+    for (const c of capabilities) {
+      if (c.trim()) parts.push(c.trim())
+    }
   }
 
   if (userPrompt && userPrompt.trim()) {

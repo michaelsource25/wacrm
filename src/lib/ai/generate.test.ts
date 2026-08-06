@@ -128,6 +128,123 @@ describe('generateReply — OpenAI', () => {
   })
 })
 
+describe('generateReply — tool loop', () => {
+  it('executes a requested tool and feeds the result back (OpenAI wire)', async () => {
+    const fetchMock = vi
+      .fn()
+      // Round 1: the model asks for a tool.
+      .mockResolvedValueOnce(
+        okResponse({
+          choices: [
+            {
+              message: {
+                content: null,
+                tool_calls: [
+                  {
+                    id: 'call_1',
+                    type: 'function',
+                    function: {
+                      name: 'check_availability',
+                      arguments: '{"date":"2026-08-07"}',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+          usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 },
+        }),
+      )
+      // Round 2: with the tool result, the model answers.
+      .mockResolvedValueOnce(
+        okResponse({
+          choices: [{ message: { content: 'Tomorrow at 2pm works!' } }],
+          usage: { prompt_tokens: 20, completion_tokens: 5, total_tokens: 25 },
+        }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const run = vi.fn().mockResolvedValue('Free slots: 14:00, 15:00')
+    const res = await generateReply({
+      config: config(),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Any time tomorrow?' }],
+      tools: [
+        {
+          def: {
+            name: 'check_availability',
+            description: 'x',
+            parameters: { type: 'object', properties: {} },
+          },
+          run,
+        },
+      ],
+    })
+
+    expect(run).toHaveBeenCalledWith({ date: '2026-08-07' })
+    expect(res.text).toBe('Tomorrow at 2pm works!')
+    // Usage accumulates across both calls.
+    expect(res.usage).toEqual({
+      promptTokens: 30,
+      completionTokens: 7,
+      totalTokens: 37,
+    })
+
+    // The second request must carry the assistant tool-call turn and
+    // the tool result, in OpenAI wire format.
+    const secondBody = JSON.parse(fetchMock.mock.calls[1][1].body)
+    const roles = secondBody.messages.map((m: { role: string }) => m.role)
+    expect(roles).toEqual(['system', 'user', 'assistant', 'tool'])
+    expect(secondBody.messages[3]).toMatchObject({
+      tool_call_id: 'call_1',
+      content: 'Free slots: 14:00, 15:00',
+    })
+  })
+
+  it('reports an unknown tool back to the model instead of crashing', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        okResponse({
+          choices: [
+            {
+              message: {
+                content: null,
+                tool_calls: [
+                  {
+                    id: 'call_x',
+                    type: 'function',
+                    function: { name: 'nope', arguments: '{}' },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        okResponse({ choices: [{ message: { content: 'ok' } }] }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await generateReply({
+      config: config(),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Hi' }],
+      tools: [
+        {
+          def: { name: 'real_tool', description: 'x', parameters: {} },
+          run: vi.fn(),
+        },
+      ],
+    })
+
+    expect(res.text).toBe('ok')
+    const secondBody = JSON.parse(fetchMock.mock.calls[1][1].body)
+    expect(secondBody.messages[3].content).toContain('unknown tool')
+  })
+})
+
 describe('generateReply — Anthropic', () => {
   it('calls the messages endpoint with the version header and parses text blocks', async () => {
     const fetchMock = vi.fn().mockResolvedValue(

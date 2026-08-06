@@ -37,6 +37,66 @@ export interface ChatMessage {
   content: string
 }
 
+// ------------------------------------------------------------
+// Tool calling (agent loop). Provider-neutral shapes: adapters
+// translate to/from each provider's wire format.
+// ------------------------------------------------------------
+
+/** Declaration of one callable tool, sent to the provider. */
+export interface ToolDef {
+  name: string
+  description: string
+  /** JSON Schema for the arguments object. */
+  parameters: Record<string, unknown>
+}
+
+/** One tool invocation the model requested. */
+export interface ToolCall {
+  id: string
+  name: string
+  /** Raw JSON string of the arguments, as the model produced them. */
+  arguments: string
+}
+
+/** A declared tool plus its server-side executor. `run` receives the
+ *  parsed arguments and returns a plain-text result for the model; it
+ *  should return error strings rather than throw for bad input. */
+export interface ExecutableTool {
+  def: ToolDef
+  run(args: Record<string, unknown>): Promise<string>
+}
+
+/** Assistant turn that requested tool calls (agent-loop internal —
+ *  never persisted or shown to the customer). */
+export interface AssistantToolMessage {
+  role: 'assistant'
+  content: string
+  toolCalls: ToolCall[]
+}
+
+/** Result of one executed tool call, fed back to the model. */
+export interface ToolResultMessage {
+  role: 'tool'
+  toolCallId: string
+  name: string
+  content: string
+}
+
+/** What provider adapters actually accept: the persisted transcript
+ *  plus any in-flight tool turns appended by the agent loop. */
+export type ProviderMessage =
+  | ChatMessage
+  | AssistantToolMessage
+  | ToolResultMessage
+
+/** Narrow a ProviderMessage to a plain text turn (no tool traffic). */
+export function isPlainChat(m: ProviderMessage): m is ChatMessage {
+  return (
+    (m.role === 'user' || m.role === 'assistant') &&
+    !('toolCalls' in m)
+  )
+}
+
 /**
  * Token counts for one provider call, normalized across OpenAI
  * (`prompt`/`completion`) and Anthropic (`input`/`output`). Null when
@@ -48,9 +108,12 @@ export interface AiUsage {
   totalTokens: number
 }
 
-/** Raw text + usage a provider adapter returns before handoff parsing. */
+/** Raw text + usage a provider adapter returns before handoff parsing.
+ *  `toolCalls` is non-empty when the model asked to run tools instead
+ *  of (or in addition to) producing text. */
 export interface ProviderResult {
   text: string
+  toolCalls: ToolCall[]
   usage: AiUsage | null
 }
 

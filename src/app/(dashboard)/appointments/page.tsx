@@ -120,6 +120,17 @@ export default function AppointmentsPage() {
   const [svcDuration, setSvcDuration] = useState(30);
   const [svcPrice, setSvcPrice] = useState("");
 
+  // Business timezone (accounts.timezone, migration 039) — drives the
+  // AI booking assistant's local-time math. Empty string = unset (UTC).
+  const [accountTz, setAccountTz] = useState("");
+  const timeZones = useMemo<string[]>(
+    () =>
+      typeof Intl.supportedValuesOf === "function"
+        ? Intl.supportedValuesOf("timeZone")
+        : [],
+    [],
+  );
+
   const days = useMemo(
     () => Array.from({ length: 6 }, (_, i) => new Date(anchor.getTime() + i * DAY_MS)),
     [anchor],
@@ -148,6 +159,38 @@ export default function AppointmentsPage() {
       .order("created_at");
     setServices((data ?? []) as Service[]);
   }, [supabase]);
+
+  useEffect(() => {
+    if (!accountId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("accounts")
+        .select("timezone")
+        .eq("id", accountId)
+        .maybeSingle();
+      if (!cancelled) setAccountTz((data?.timezone as string | null) ?? "");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, accountId]);
+
+  async function saveTimezone(tz: string) {
+    if (!accountId) return;
+    const prev = accountTz;
+    setAccountTz(tz);
+    const { error } = await supabase
+      .from("accounts")
+      .update({ timezone: tz || null })
+      .eq("id", accountId);
+    if (error) {
+      setAccountTz(prev);
+      toast.error(t("toasts.timezoneFailed"));
+      return;
+    }
+    toast.success(t("toasts.timezoneSaved"));
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -309,6 +352,11 @@ export default function AppointmentsPage() {
     () => new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }),
     [locale],
   );
+  // Gutter labels: hour-only, so the locale decides 12h ("8 AM") vs 24h.
+  const hourFmt = useMemo(
+    () => new Intl.DateTimeFormat(locale, { hour: "numeric" }),
+    [locale],
+  );
 
   const today = toLocalDateInput(new Date());
   const hours = Array.from(
@@ -423,7 +471,7 @@ export default function AppointmentsPage() {
                   className="absolute right-2 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground"
                   style={{ top: i * HOUR_PX }}
                 >
-                  {h}:00
+                  {hourFmt.format(new Date(2000, 0, 1, h))}
                 </span>
               ))}
             </div>
@@ -465,6 +513,10 @@ export default function AppointmentsPage() {
                     );
                     if (startMin + durMin < 0 || startMin > hours.length * 60)
                       return null;
+                    const heightPx = Math.max((durMin / 60) * HOUR_PX - 2, 22);
+                    // Two 11px lines need ~34px; below that, collapse to
+                    // one line so nothing renders half-clipped.
+                    const compact = heightPx < 34;
                     return (
                       <button
                         key={apt.id}
@@ -476,15 +528,28 @@ export default function AppointmentsPage() {
                         )}
                         style={{
                           top: Math.max((startMin / 60) * HOUR_PX, 0),
-                          height: Math.max((durMin / 60) * HOUR_PX - 2, 22),
+                          height: heightPx,
                         }}
                       >
-                        <span className="block truncate font-medium">
-                          {apt.service_name || t("noService")}
-                        </span>
-                        <span className="block truncate text-muted-foreground">
-                          {timeFmt.format(start)} · {apt.contact?.name || apt.contact?.phone || "—"}
-                        </span>
+                        {compact ? (
+                          <span className="block truncate">
+                            <span className="font-medium">
+                              {timeFmt.format(start)}
+                            </span>{" "}
+                            · {apt.contact?.name || apt.contact?.phone || "—"}
+                            {apt.service_name && ` · ${apt.service_name}`}
+                          </span>
+                        ) : (
+                          <>
+                            <span className="block truncate font-medium">
+                              {apt.service_name || t("noService")}
+                            </span>
+                            <span className="block truncate text-muted-foreground">
+                              {timeFmt.format(start)} ·{" "}
+                              {apt.contact?.name || apt.contact?.phone || "—"}
+                            </span>
+                          </>
+                        )}
                       </button>
                     );
                   })}
@@ -751,6 +816,25 @@ export default function AppointmentsPage() {
             <DialogTitle>{t("services")}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-2">
+            <div className="mb-2 flex flex-col gap-1.5">
+              <Label htmlFor="account-tz">{t("timezone")}</Label>
+              <select
+                id="account-tz"
+                value={accountTz}
+                onChange={(e) => saveTimezone(e.target.value)}
+                className="h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              >
+                <option value="">UTC</option>
+                {timeZones.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                {t("timezoneDesc")}
+              </p>
+            </div>
             {services.length === 0 && (
               <p className="text-sm text-muted-foreground">{t("noServices")}</p>
             )}
