@@ -59,6 +59,14 @@ export async function dispatchInboundToAiReply(
     // avoid double-texting the customer. (Relationship triggers like
     // `first_inbound_message` don't count — they're not per-message
     // auto-responders.)
+    // From here on the account HAS auto-reply enabled, so a stand-down
+    // is worth one log line — "the bot went quiet" is otherwise
+    // undiagnosable from the outside.
+    const standDown = (reason: string) =>
+      console.info(
+        `[ai auto-reply] standing down on conversation ${conversationId}: ${reason}`,
+      )
+
     const { data: autoResponders } = await db
       .from('automations')
       .select('id')
@@ -66,22 +74,34 @@ export async function dispatchInboundToAiReply(
       .eq('is_active', true)
       .in('trigger_type', ['new_message_received', 'keyword_match'])
       .limit(1)
-    if (autoResponders && autoResponders.length > 0) return
+    if (autoResponders && autoResponders.length > 0) {
+      return standDown(
+        'an active new-message/keyword automation exists — deterministic responders win',
+      )
+    }
 
     const { data: conv, error: convErr } = await db
       .from('conversations')
       .select('assigned_agent_id, ai_autoreply_disabled, ai_reply_count')
       .eq('id', conversationId)
       .maybeSingle()
-    if (convErr || !conv) return
-    if (conv.assigned_agent_id) return // a human owns this thread
-    if (conv.ai_autoreply_disabled) return // handed off / turned off here
+    if (convErr || !conv) return standDown('conversation not found')
+    if (conv.assigned_agent_id) {
+      return standDown('a human agent is assigned to this thread')
+    }
+    if (conv.ai_autoreply_disabled) {
+      return standDown('auto-reply is paused here (handoff / take-over)')
+    }
     // Cheap early-out; the authoritative cap check is the atomic claim
     // below (this read can race a concurrent inbound).
-    if (conv.ai_reply_count >= config.autoReplyMaxPerConversation) return
+    if (conv.ai_reply_count >= config.autoReplyMaxPerConversation) {
+      return standDown(
+        `per-conversation reply cap reached (${conv.ai_reply_count}/${config.autoReplyMaxPerConversation}) — Resume AI resets it`,
+      )
+    }
 
     const messages = await buildConversationContext(db, conversationId)
-    if (messages.length === 0) return
+    if (messages.length === 0) return standDown('no text messages to reply to')
 
     // Account-wide throttle on the shared BYO key. The per-conversation
     // cap bounds one thread; this bounds a burst across many threads (a
