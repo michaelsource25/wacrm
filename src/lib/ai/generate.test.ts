@@ -201,7 +201,54 @@ describe('generateReply — tool loop', () => {
     })
   })
 
-  it('hands off instead of sending leaked tool syntax to the customer', async () => {
+  it('retries without tools and still answers when the model leaks tool syntax', async () => {
+    const fetchMock = vi
+      .fn()
+      // Round 1 (with tools): the model writes the call as text.
+      .mockResolvedValueOnce(
+        okResponse({
+          choices: [
+            {
+              message: {
+                content:
+                  "Solo un momento, por favor.\n*tool_code\nprint(default_api.check_availability(date='2026-06-09'))",
+              },
+            },
+          ],
+        }),
+      )
+      // Round 2 (tools stripped): a plain conversational answer.
+      .mockResolvedValueOnce(
+        okResponse({
+          choices: [{ message: { content: 'Déjame verificar y te confirmo.' } }],
+        }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await generateReply({
+      config: config(),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Cita mañana a las 3' }],
+      tools: [
+        {
+          def: {
+            name: 'check_availability',
+            description: 'x',
+            parameters: { type: 'object', properties: {} },
+          },
+          run: vi.fn(),
+        },
+      ],
+    })
+
+    expect(res.handoff).toBe(false)
+    expect(res.text).toBe('Déjame verificar y te confirmo.')
+    // The retry must not offer tools again.
+    const secondBody = JSON.parse(fetchMock.mock.calls[1][1].body)
+    expect(secondBody.tools).toBeUndefined()
+  })
+
+  it('hands off only when the leak persists even without tools', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -209,8 +256,7 @@ describe('generateReply — tool loop', () => {
           choices: [
             {
               message: {
-                content:
-                  "Solo un momento, por favor.\n*tool_code\nprint(default_api.check_availability(date='2026-06-09'))",
+                content: '*tool_code\nprint(default_api.book_appointment())',
               },
             },
           ],
@@ -225,7 +271,7 @@ describe('generateReply — tool loop', () => {
       tools: [
         {
           def: {
-            name: 'check_availability',
+            name: 'book_appointment',
             description: 'x',
             parameters: { type: 'object', properties: {} },
           },

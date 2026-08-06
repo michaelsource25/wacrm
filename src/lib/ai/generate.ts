@@ -48,9 +48,15 @@ export async function generateReply(args: GenerateArgs): Promise<GenerateResult>
 
   const convo: ProviderMessage[] = [...messages]
   let usageTotal: AiUsage | null = null
+  // Flipped when the model "called" a tool by writing the invocation
+  // as text (weak models do this instead of native tool calling): we
+  // retry once with tools stripped so the customer still gets a plain
+  // conversational answer instead of silence or leaked syntax.
+  let toolsDisabled = false
 
   for (let round = 0; ; round++) {
-    const useTools = !!toolDefs && toolDefs.length > 0 && round < MAX_TOOL_ROUNDS
+    const useTools =
+      !!toolDefs && toolDefs.length > 0 && round < MAX_TOOL_ROUNDS && !toolsDisabled
     const result = await callProvider(config, {
       apiKey: config.apiKey,
       model: config.model,
@@ -63,18 +69,24 @@ export async function generateReply(args: GenerateArgs): Promise<GenerateResult>
 
     if (!useTools || result.toolCalls.length === 0) {
       const parsed = parseGeneration(result.text, usageTotal)
-      // Some models (notably weak/free ones) "call" tools by writing
-      // the invocation as text instead of using native tool calling.
-      // That syntax must never reach a customer: treat the turn as a
-      // handoff so a human picks it up instead.
+      // Leaked tool syntax must never reach a customer.
       if (
         toolDefs &&
         toolDefs.length > 0 &&
         parsed.text &&
         leaksToolSyntax(parsed.text, toolDefs.map((d) => d.name))
       ) {
+        if (!toolsDisabled) {
+          console.warn(
+            '[ai generate] model wrote a tool call as text — retrying without tools so the customer still gets a reply. Consider a model with solid native tool calling.',
+          )
+          toolsDisabled = true
+          continue
+        }
+        // Still leaking with no tools on offer — last resort: hand off
+        // rather than send machinery to the customer.
         console.warn(
-          '[ai generate] model wrote a tool call as text — handing off instead of sending it to the customer. Consider a model with solid native tool calling.',
+          '[ai generate] tool syntax leaked even without tools — handing off.',
         )
         return { text: '', handoff: true, usage: usageTotal }
       }
