@@ -103,6 +103,9 @@
     },
     "timezone": "비즈니스 시간대",
     "timezoneDesc": "영업시간과 AI 예약 어시스턴트에 사용됩니다.",
+    "reminders": "예약 리마인더",
+    "remindersDesc": "각 예약 약 24시간 전과 2시간 전에 WhatsApp 메시지를 보냅니다. AI 어시스턴트가 활성화되어 있으면 AI가 메시지를 작성하고, 그렇지 않으면 이 템플릿이 사용됩니다.",
+    "reminderTemplateHint": "플레이스홀더: '{name}', '{service}', '{date}', '{time}'. 비워 두면 기본 메시지가 사용됩니다.",
     "toasts": {
       "created": "예약이 생성되었습니다",
       "updated": "예약이 업데이트되었습니다",
@@ -114,7 +117,9 @@
       "slotTaken": "해당 시간은 다른 예약과 겹칩니다",
       "invalidDate": "유효한 날짜와 시간을 입력하세요",
       "timezoneSaved": "시간대가 저장되었습니다",
-      "timezoneFailed": "시간대를 저장할 수 없습니다"
+      "timezoneFailed": "시간대를 저장할 수 없습니다",
+      "reminderSaved": "리마인더 설정이 저장되었습니다",
+      "reminderFailed": "리마인더 설정을 저장할 수 없습니다"
     }
   },
   "Dashboard": {

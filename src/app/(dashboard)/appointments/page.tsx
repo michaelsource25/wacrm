@@ -31,6 +31,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import { DEFAULT_REMINDER_TEMPLATE } from "@/lib/appointments/reminder-template";
 import { useAuth } from "@/hooks/use-auth";
 import { useCan } from "@/hooks/use-can";
 import { cn } from "@/lib/utils";
@@ -123,6 +125,11 @@ export default function AppointmentsPage() {
   // Business timezone (accounts.timezone, migration 039) — drives the
   // AI booking assistant's local-time math. Empty string = unset (UTC).
   const [accountTz, setAccountTz] = useState("");
+  // Reminder knobs (accounts.*, migration 040). The template textarea
+  // saves on blur; empty = use the built-in default.
+  const [remindersEnabled, setRemindersEnabled] = useState(true);
+  const [reminderTemplate, setReminderTemplate] = useState("");
+  const [savedReminderTemplate, setSavedReminderTemplate] = useState("");
   const timeZones = useMemo<string[]>(
     () =>
       typeof Intl.supportedValuesOf === "function"
@@ -166,15 +173,53 @@ export default function AppointmentsPage() {
     (async () => {
       const { data } = await supabase
         .from("accounts")
-        .select("timezone")
+        .select(
+          "timezone, appointment_reminders_enabled, appointment_reminder_template",
+        )
         .eq("id", accountId)
         .maybeSingle();
-      if (!cancelled) setAccountTz((data?.timezone as string | null) ?? "");
+      if (cancelled || !data) return;
+      setAccountTz((data.timezone as string | null) ?? "");
+      setRemindersEnabled(data.appointment_reminders_enabled !== false);
+      const tpl = (data.appointment_reminder_template as string | null) ?? "";
+      setReminderTemplate(tpl);
+      setSavedReminderTemplate(tpl);
     })();
     return () => {
       cancelled = true;
     };
   }, [supabase, accountId]);
+
+  async function saveRemindersEnabled(enabled: boolean) {
+    if (!accountId) return;
+    const prev = remindersEnabled;
+    setRemindersEnabled(enabled);
+    const { error } = await supabase
+      .from("accounts")
+      .update({ appointment_reminders_enabled: enabled })
+      .eq("id", accountId);
+    if (error) {
+      setRemindersEnabled(prev);
+      toast.error(t("toasts.reminderFailed"));
+      return;
+    }
+    toast.success(t("toasts.reminderSaved"));
+  }
+
+  async function saveReminderTemplate() {
+    if (!accountId || reminderTemplate === savedReminderTemplate) return;
+    const value = reminderTemplate.trim();
+    const { error } = await supabase
+      .from("accounts")
+      .update({ appointment_reminder_template: value || null })
+      .eq("id", accountId);
+    if (error) {
+      toast.error(t("toasts.reminderFailed"));
+      return;
+    }
+    setSavedReminderTemplate(reminderTemplate);
+    toast.success(t("toasts.reminderSaved"));
+  }
 
   async function saveTimezone(tz: string) {
     if (!accountId) return;
@@ -834,6 +879,35 @@ export default function AppointmentsPage() {
               <p className="text-xs text-muted-foreground">
                 {t("timezoneDesc")}
               </p>
+            </div>
+
+            {/* Appointment reminders (migration 040) */}
+            <div className="mb-2 flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="reminders-enabled">{t("reminders")}</Label>
+                <Switch
+                  id="reminders-enabled"
+                  checked={remindersEnabled}
+                  onCheckedChange={saveRemindersEnabled}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("remindersDesc")}
+              </p>
+              {remindersEnabled && (
+                <>
+                  <Textarea
+                    rows={3}
+                    placeholder={DEFAULT_REMINDER_TEMPLATE}
+                    value={reminderTemplate}
+                    onChange={(e) => setReminderTemplate(e.target.value)}
+                    onBlur={saveReminderTemplate}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t("reminderTemplateHint")}
+                  </p>
+                </>
+              )}
             </div>
             {services.length === 0 && (
               <p className="text-sm text-muted-foreground">{t("noServices")}</p>

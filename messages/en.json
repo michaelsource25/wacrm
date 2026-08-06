@@ -103,6 +103,9 @@
     },
     "timezone": "Business timezone",
     "timezoneDesc": "Used for opening hours and the AI booking assistant.",
+    "reminders": "Appointment reminders",
+    "remindersDesc": "Sends a WhatsApp message ~24h and ~2h before each appointment. When the AI assistant is active it writes the message; otherwise this template is used.",
+    "reminderTemplateHint": "Placeholders: '{name}', '{service}', '{date}', '{time}'. Leave empty to use the default message.",
     "toasts": {
       "created": "Appointment created",
       "updated": "Appointment updated",
@@ -114,7 +117,9 @@
       "slotTaken": "That time overlaps another appointment",
       "invalidDate": "Enter a valid date and time",
       "timezoneSaved": "Timezone saved",
-      "timezoneFailed": "Could not save the timezone"
+      "timezoneFailed": "Could not save the timezone",
+      "reminderSaved": "Reminder settings saved",
+      "reminderFailed": "Could not save the reminder settings"
     }
   },
   "Dashboard": {
