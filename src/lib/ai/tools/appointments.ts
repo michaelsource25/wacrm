@@ -438,6 +438,7 @@ export async function buildAppointmentTools(
     `Current local date and time for the business: ${nowLocal}${timezone ? ` (${timezone})` : ' (UTC)'}. Use it to resolve relative dates like "tomorrow". All times you mention to the customer are in this local time.`,
     `Services offered:\n${serviceLines}`,
     'Protocol: check_availability before proposing times, and only offer times it returned. Book only after the customer explicitly confirms one specific date and time, then confirm it back to them. If they ask to cancel or move an appointment, use list_my_appointments first, then cancel_appointment or reschedule_appointment. If a tool returns an error, do not pretend it succeeded — tell the customer honestly or hand off.',
+    'Invoke tools ONLY through the native tool-calling mechanism. NEVER write tool names, function-call syntax, code, or anything like "tool_code" in your reply text — the customer sees your text verbatim and must never see tool machinery.',
   ].join('\n')
 
   return { tools, prompt }

@@ -62,7 +62,23 @@ export async function generateReply(args: GenerateArgs): Promise<GenerateResult>
     usageTotal = addUsage(usageTotal, result.usage)
 
     if (!useTools || result.toolCalls.length === 0) {
-      return parseGeneration(result.text, usageTotal)
+      const parsed = parseGeneration(result.text, usageTotal)
+      // Some models (notably weak/free ones) "call" tools by writing
+      // the invocation as text instead of using native tool calling.
+      // That syntax must never reach a customer: treat the turn as a
+      // handoff so a human picks it up instead.
+      if (
+        toolDefs &&
+        toolDefs.length > 0 &&
+        parsed.text &&
+        leaksToolSyntax(parsed.text, toolDefs.map((d) => d.name))
+      ) {
+        console.warn(
+          '[ai generate] model wrote a tool call as text — handing off instead of sending it to the customer. Consider a model with solid native tool calling.',
+        )
+        return { text: '', handoff: true, usage: usageTotal }
+      }
+      return parsed
     }
 
     convo.push({
@@ -79,6 +95,19 @@ export async function generateReply(args: GenerateArgs): Promise<GenerateResult>
       })
     }
   }
+}
+
+/**
+ * True when reply text contains tool-invocation syntax instead of (or
+ * alongside) a real message — e.g. Gemini-style `tool_code` /
+ * `default_api.foo(...)` blocks, or any declared tool name used as a
+ * call. Checked only when tools were offered on the request.
+ */
+function leaksToolSyntax(text: string, toolNames: string[]): boolean {
+  if (/tool_code|default_api\s*[.(]|<\s*(tool|function)[_ ]?call/i.test(text)) {
+    return true
+  }
+  return toolNames.some((n) => text.includes(`${n}(`))
 }
 
 /** Execute one requested tool call. Failures are reported to the model

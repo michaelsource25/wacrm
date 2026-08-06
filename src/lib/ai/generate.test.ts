@@ -201,6 +201,67 @@ describe('generateReply — tool loop', () => {
     })
   })
 
+  it('hands off instead of sending leaked tool syntax to the customer', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        okResponse({
+          choices: [
+            {
+              message: {
+                content:
+                  "Solo un momento, por favor.\n*tool_code\nprint(default_api.check_availability(date='2026-06-09'))",
+              },
+            },
+          ],
+        }),
+      ),
+    )
+
+    const res = await generateReply({
+      config: config(),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Cita mañana a las 3' }],
+      tools: [
+        {
+          def: {
+            name: 'check_availability',
+            description: 'x',
+            parameters: { type: 'object', properties: {} },
+          },
+          run: vi.fn(),
+        },
+      ],
+    })
+
+    expect(res.handoff).toBe(true)
+    expect(res.text).toBe('')
+  })
+
+  it('does not scrub normal text when tools are offered', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        okResponse({
+          choices: [{ message: { content: 'Tenemos espacio mañana a las 3pm.' } }],
+        }),
+      ),
+    )
+    const res = await generateReply({
+      config: config(),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Cita mañana a las 3' }],
+      tools: [
+        {
+          def: { name: 'check_availability', description: 'x', parameters: {} },
+          run: vi.fn(),
+        },
+      ],
+    })
+    expect(res.handoff).toBe(false)
+    expect(res.text).toBe('Tenemos espacio mañana a las 3pm.')
+  })
+
   it('reports an unknown tool back to the model instead of crashing', async () => {
     const fetchMock = vi
       .fn()
