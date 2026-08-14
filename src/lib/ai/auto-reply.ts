@@ -5,11 +5,26 @@ import { retrieveKnowledge } from './knowledge'
 import { generateReply } from './generate'
 import { buildSystemPrompt } from './defaults'
 import { buildAppointmentTools } from './tools/appointments'
+import { buildProductTools } from './tools/products'
 import { buildHandoffSummary } from './handoff'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
 import { engineSendText } from '@/lib/flows/meta-send'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+
+/** The account's display currency (021), for prices the bot quotes.
+ *  Falls back to USD — the same default the column carries. */
+async function accountCurrency(
+  db: ReturnType<typeof supabaseAdmin>,
+  accountId: string,
+): Promise<string> {
+  const { data } = await db
+    .from('accounts')
+    .select('default_currency')
+    .eq('id', accountId)
+    .maybeSingle()
+  return (data?.default_currency as string | null) ?? 'USD'
+}
 
 interface DispatchArgs {
   /** Tenancy key — drives config, contact, and whatsapp_config lookups. */
@@ -120,30 +135,47 @@ export async function dispatchInboundToAiReply(
     }
 
     // Ground the reply in the account's knowledge base (best-effort),
-    // and load pluggable bot capabilities. Appointment tools appear
-    // only when the account actually uses the appointments module —
-    // a booking failure must not silence the whole bot, so it
-    // degrades to a plain reply.
-    const [knowledge, booking] = await Promise.all([
+    // and load the pluggable bot capabilities. Each one activates only
+    // when the account actually uses that module (appointments: has
+    // services/rules/appointments; products: has active catalog rows),
+    // so a generalist support bot stays generalist. A capability that
+    // fails to load must never silence the whole bot, so each degrades
+    // to "not offered" and the reply goes out without it.
+    const [knowledge, booking, catalog] = await Promise.all([
       retrieveKnowledge(db, accountId, config, latestUserMessage(messages)),
       buildAppointmentTools(db, { accountId, contactId }).catch((err) => {
         console.error('[ai auto-reply] appointment tools unavailable:', err)
         return null
       }),
+      buildProductTools(db, {
+        accountId,
+        conversationId,
+        contactId,
+        configOwnerUserId,
+        currency: await accountCurrency(db, accountId),
+      }).catch((err) => {
+        console.error('[ai auto-reply] product tools unavailable:', err)
+        return null
+      }),
     ])
+
+    const capabilities = [booking?.prompt, catalog?.prompt].filter(
+      (p): p is string => !!p,
+    )
+    const tools = [...(booking?.tools ?? []), ...(catalog?.tools ?? [])]
 
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
       mode: 'auto_reply',
       knowledge,
-      capabilities: booking ? [booking.prompt] : undefined,
+      capabilities: capabilities.length > 0 ? capabilities : undefined,
     })
 
     const { text, handoff, usage } = await generateReply({
       config,
       systemPrompt,
       messages,
-      tools: booking?.tools,
+      tools: tools.length > 0 ? tools : undefined,
     })
 
     // Record token spend on the account's BYO key. Fire-and-forget so it

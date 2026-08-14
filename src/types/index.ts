@@ -400,6 +400,20 @@ export interface Service {
   updated_at: string;
 }
 
+/** Catalog item (migration 041). `image_url` is a public
+ *  product-media URL Meta fetches when the bot sends the photo. */
+export interface Product {
+  id: string;
+  account_id: string;
+  name: string;
+  description?: string | null;
+  price?: number | null;
+  image_url?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Weekly opening-hours window. weekday: 0 = Sunday … 6 = Saturday. */
 export interface AvailabilityRule {
   id: string;
