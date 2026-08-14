@@ -3,12 +3,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildConversationContext } from './context'
 
 /** Minimal fake matching the query chain in buildConversationContext:
- *  from().select().eq().eq().order().limit() → { data, error }. */
+ *  from().select().eq().or().order().limit() → { data, error }. */
 function fakeDb(rows: unknown[]): SupabaseClient {
   const chain = {
     from: () => chain,
     select: () => chain,
     eq: () => chain,
+    or: () => chain,
     order: () => chain,
     limit: () => Promise.resolve({ data: rows, error: null }),
   }
@@ -37,6 +38,38 @@ describe('buildConversationContext', () => {
       'conv-1',
     )
     expect(out).toEqual([{ role: 'assistant', content: 'auto reply' }])
+  })
+
+  it('reads a transcribed voice note as a customer turn', async () => {
+    const out = await buildConversationContext(
+      fakeDb([
+        {
+          sender_type: 'customer',
+          content_type: 'audio',
+          content_text: null,
+          transcript: 'hola quiero una cita',
+        },
+      ]),
+      'conv-1',
+    )
+    expect(out).toEqual([{ role: 'user', content: 'hola quiero una cita' }])
+  })
+
+  it('keeps both caption and transcript when an audio has a caption', async () => {
+    const out = await buildConversationContext(
+      fakeDb([
+        {
+          sender_type: 'customer',
+          content_type: 'audio',
+          content_text: 'mira',
+          transcript: 'el pedido llegó roto',
+        },
+      ]),
+      'conv-1',
+    )
+    expect(out).toEqual([
+      { role: 'user', content: 'mira\nel pedido llegó roto' },
+    ])
   })
 
   it('drops empty / whitespace-only messages', async () => {

@@ -172,6 +172,13 @@ function MessageContent({ message, t }: { message: Message, t: ReturnType<typeof
           ) : (
             <MediaUnavailable label={t("audio")} t={t} />
           )}
+          {/* Machine transcription (migration 042) — labelled, so it's
+              never mistaken for something the customer typed. */}
+          {message.transcript && (
+            <p className="mt-1 max-w-60 whitespace-pre-wrap break-words text-sm italic opacity-80">
+              {message.transcript}
+            </p>
+          )}
         </div>
       );
 

@@ -8,6 +8,7 @@ import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
+import { transcribeInboundAudio } from '@/lib/ai/transcribe'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
 import {
   handleTemplateWebhookChange,
@@ -615,6 +616,21 @@ async function processMessage(
   const { contentText, mediaUrl, mediaType, interactiveReplyId } =
     await parseMessageContent(message, accessToken)
 
+  // Voice notes: transcribe BEFORE the insert so the text lands in the
+  // same row, and so every downstream consumer (automations' keyword
+  // matching, the AI auto-reply gate) can treat the audio as if the
+  // customer had typed it. Best-effort and self-contained: a failure
+  // leaves a normal audio bubble that a human can still play.
+  let transcript: string | null = null
+  if (message.type === 'audio' && message.audio?.id) {
+    transcript = await transcribeVoiceNote({
+      mediaId: message.audio.id,
+      mimeType: message.audio.mime_type,
+      accessToken,
+      accountId,
+    })
+  }
+
   // Resolve swipe-reply context if present. A missing parent is fine —
   // we just store NULL and the UI renders the message without a quote.
   let replyToInternalId: string | null = null
@@ -676,6 +692,10 @@ async function processMessage(
     status: 'delivered',
     created_at: new Date(parseInt(message.timestamp) * 1000).toISOString(),
     reply_to_message_id: replyToInternalId,
+    // Machine transcription of a voice note (migration 042); NULL for
+    // every other content type. Kept out of content_text so the UI can
+    // label it as machine-generated.
+    transcript,
     // Only populated for content_type='interactive'. Migration 010 added
     // the column; null for every other content_type so existing inserts
     // behave identically.
@@ -691,7 +711,7 @@ async function processMessage(
   const { error: convError } = await supabaseAdmin()
     .from('conversations')
     .update({
-      last_message_text: contentText || `[${message.type}]`,
+      last_message_text: contentText || transcript || `[${message.type}]`,
       last_message_at: new Date().toISOString(),
       unread_count: (conversation.unread_count || 0) + 1,
       updated_at: new Date().toISOString(),
@@ -753,7 +773,10 @@ async function processMessage(
   // message all exist before any step — including send_message — runs.
   // Fire-and-forget: a slow or failing automation must not block the
   // webhook's 200 OK response to Meta.
-  const inboundText = contentText ?? message.text?.body ?? ''
+  // A transcribed voice note counts as inbound text: keyword
+  // automations match on it, and the AI auto-reply gate below fires
+  // for it the same way it would for a typed message.
+  const inboundText = contentText ?? message.text?.body ?? transcript ?? ''
   const automationTriggers: (
     | 'new_contact_created'
     | 'first_inbound_message'
@@ -832,6 +855,43 @@ async function processMessage(
     content_type: contentType,
     text: contentText,
   })
+}
+
+/**
+ * Download a voice note from Meta and transcribe it (migration 042).
+ *
+ * Two-step media flow like the rest of the webhook: resolve the
+ * short-lived download URL, then fetch the bytes with the account's
+ * access token. Returns null on any failure — a voice note that can't
+ * be transcribed still reaches the inbox as a playable bubble, so
+ * this must never throw into the webhook's 200 to Meta.
+ */
+async function transcribeVoiceNote(args: {
+  mediaId: string
+  mimeType: string
+  accessToken: string
+  accountId: string
+}): Promise<string | null> {
+  const { mediaId, mimeType, accessToken, accountId } = args
+  try {
+    const { url } = await getMediaUrl({ mediaId, accessToken })
+    const { buffer, contentType } = await downloadMedia({
+      downloadUrl: url,
+      accessToken,
+    })
+    return await transcribeInboundAudio(supabaseAdmin(), {
+      accountId,
+      audio: buffer,
+      // Meta's message-level mime_type is the more specific of the two.
+      contentType: mimeType || contentType,
+    })
+  } catch (error) {
+    console.error(
+      `[webhook] voice-note transcription failed for media ${mediaId}:`,
+      error instanceof Error ? error.message : error,
+    )
+    return null
+  }
 }
 
 async function parseMessageContent(

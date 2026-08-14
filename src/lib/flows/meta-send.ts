@@ -248,6 +248,10 @@ export async function engineSendMedia(
     sender_type: 'bot',
     content_type: args.kind,
     content_text: args.caption ?? null,
+    // The inbox renders outbound media from `media_url` (same column the
+    // composer's sender fills). Without it the bubble falls back to
+    // "Photo unavailable" even though Meta delivered the media fine.
+    media_url: args.link,
     message_id: waMessageId,
     status: 'sent',
   })

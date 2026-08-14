@@ -232,6 +232,12 @@ export interface Message {
   created_at: string;
   reply_to_message_id?: string;
   /**
+   * Machine transcription of an inbound voice note (migration 042).
+   * Kept separate from `content_text` so the UI can label it as
+   * machine-generated. Undefined for every other content type.
+   */
+  transcript?: string | null;
+  /**
    * Only set when `content_type === 'interactive'` — the stable id of
    * the button or list row the customer tapped. The Flows engine uses
    * this to route the next node; the inbox bubble uses it as a styling
