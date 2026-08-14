@@ -14,6 +14,10 @@ const h = vi.hoisted(() => ({
     claim: true as boolean,
     updatePayload: null as Record<string, unknown> | null,
     rpcCalls: [] as { name: string; args: unknown }[],
+    /** created_at of the bot's most recent auto-reply in the thread,
+     *  or null when it has never replied here. Drives the
+     *  returning-customer session reset. */
+    lastBotReplyAt: null as string | null,
   },
 }))
 
@@ -33,6 +37,24 @@ vi.mock('./admin-client', () => ({
           in: () => chain,
           limit: () =>
             Promise.resolve({ data: h.state.autoResponders, error: null }),
+        }
+        return chain
+      }
+      if (table === 'messages') {
+        // .select().eq().eq().order().limit().maybeSingle() → the bot's
+        // last auto-reply, used to detect a returning customer.
+        const chain = {
+          select: () => chain,
+          eq: () => chain,
+          order: () => chain,
+          limit: () => chain,
+          maybeSingle: () =>
+            Promise.resolve({
+              data: h.state.lastBotReplyAt
+                ? { created_at: h.state.lastBotReplyAt }
+                : null,
+              error: null,
+            }),
         }
         return chain
       }
@@ -91,6 +113,8 @@ beforeEach(() => {
   h.state.claim = true
   h.state.updatePayload = null
   h.state.rpcCalls = []
+  // Default: the bot replied a minute ago — same session, no reset.
+  h.state.lastBotReplyAt = new Date(Date.now() - 60_000).toISOString()
   h.loadAiConfig.mockResolvedValue(aiConfig())
   h.buildConversationContext.mockResolvedValue([{ role: 'user', content: 'hi' }])
   h.retrieveKnowledge.mockResolvedValue([])
@@ -175,6 +199,40 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
       ai_reply_count: 3,
     }
     await dispatchInboundToAiReply(ARGS)
+    expect(h.engineSendText).not.toHaveBeenCalled()
+  })
+
+  it('resets the reply budget when the customer returns after a long gap', async () => {
+    // Cap reached, but the bot last replied here 8 hours ago — that's a
+    // new session, so the budget starts over and the bot answers.
+    h.state.conv = {
+      assigned_agent_id: null,
+      ai_autoreply_disabled: false,
+      ai_reply_count: 3,
+    }
+    h.state.lastBotReplyAt = new Date(
+      Date.now() - 8 * 60 * 60_000,
+    ).toISOString()
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toEqual({ ai_reply_count: 0 })
+    expect(h.engineSendText).toHaveBeenCalled()
+  })
+
+  it('does not reset the budget within the same session', async () => {
+    // Cap reached and the bot replied 30 minutes ago — same burst, so
+    // the cap still bites (this is the runaway-loop guard).
+    h.state.conv = {
+      assigned_agent_id: null,
+      ai_autoreply_disabled: false,
+      ai_reply_count: 3,
+    }
+    h.state.lastBotReplyAt = new Date(Date.now() - 30 * 60_000).toISOString()
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toBeNull()
     expect(h.engineSendText).not.toHaveBeenCalled()
   })
 

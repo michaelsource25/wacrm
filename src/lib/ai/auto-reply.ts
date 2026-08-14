@@ -12,6 +12,42 @@ import { latestUserMessage } from './query'
 import { engineSendText } from '@/lib/flows/meta-send'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
+const DEFAULT_SESSION_GAP_HOURS = 6
+
+/** Quiet period after which a new inbound counts as a fresh session
+ *  (and a fresh reply budget). Override with `AI_SESSION_GAP_HOURS`. */
+export function aiSessionGapHours(): number {
+  const raw = Number(process.env.AI_SESSION_GAP_HOURS)
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_SESSION_GAP_HOURS
+}
+
+/**
+ * True when the bot hasn't auto-replied in this thread for longer than
+ * the session gap — i.e. the customer went away and came back.
+ *
+ * Anchored on the bot's own last auto-reply rather than the last
+ * message in the thread: the webhook has already persisted the inbound
+ * that triggered us, so "last message" would always be seconds old.
+ * A thread the bot has never replied to has no session to continue,
+ * and its count is 0 anyway, so the caller skips this.
+ */
+async function isNewSession(
+  db: ReturnType<typeof supabaseAdmin>,
+  conversationId: string,
+): Promise<boolean> {
+  const { data } = await db
+    .from('messages')
+    .select('created_at')
+    .eq('conversation_id', conversationId)
+    .eq('ai_generated', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (!data?.created_at) return false
+  const gapMs = Date.now() - Date.parse(data.created_at as string)
+  return gapMs > aiSessionGapHours() * 60 * 60_000
+}
+
 /** The account's display currency (021), for prices the bot quotes.
  *  Falls back to USD — the same default the column carries. */
 async function accountCurrency(
@@ -107,11 +143,31 @@ export async function dispatchInboundToAiReply(
     if (conv.ai_autoreply_disabled) {
       return standDown('auto-reply is paused here (handoff / take-over)')
     }
+    // A returning customer starts a fresh session. The reply cap exists
+    // to stop a runaway loop (two bots answering each other), which
+    // plays out in minutes — so a long quiet gap unambiguously means
+    // "new conversation", not "same burst". Without this the counter
+    // accumulates across weeks and the bot eventually goes permanently
+    // silent on exactly the customers who come back most often.
+    let replyCount = conv.ai_reply_count ?? 0
+    if (replyCount > 0 && (await isNewSession(db, conversationId))) {
+      // Concurrent inbounds can both reset; that's idempotent, and the
+      // atomic claim below still enforces the cap.
+      await db
+        .from('conversations')
+        .update({ ai_reply_count: 0 })
+        .eq('id', conversationId)
+      console.info(
+        `[ai auto-reply] conversation ${conversationId}: customer returned after ${aiSessionGapHours()}h+ — reply budget reset.`,
+      )
+      replyCount = 0
+    }
+
     // Cheap early-out; the authoritative cap check is the atomic claim
     // below (this read can race a concurrent inbound).
-    if (conv.ai_reply_count >= config.autoReplyMaxPerConversation) {
+    if (replyCount >= config.autoReplyMaxPerConversation) {
       return standDown(
-        `per-conversation reply cap reached (${conv.ai_reply_count}/${config.autoReplyMaxPerConversation}) — Resume AI resets it`,
+        `per-conversation reply cap reached (${replyCount}/${config.autoReplyMaxPerConversation}) — Resume AI resets it`,
       )
     }
 
