@@ -30,8 +30,29 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
+  // `apple` must be listed here, not left to the app/apple-icon.tsx
+  // file convention: declaring `icons` explicitly overrides the file
+  // conventions entirely, so without this line the route still builds
+  // but no <link rel="apple-touch-icon"> is emitted — and iOS falls
+  // back to a screenshot of the page as the home-screen icon.
   icons: {
     icon: [{ url: "/icon" }],
+    apple: [{ url: "/apple-icon", sizes: "180x180" }],
+  },
+  // Installed-app behaviour on iOS. Safari doesn't read the web
+  // manifest for "Add to Home Screen", so `display: standalone` there
+  // comes from `capable` — without it the CRM opens with the address
+  // bar and looks like a bookmark rather than an app. The title is
+  // what shows under the home-screen icon, so it stays short.
+  // `default` keeps the status bar opaque with the page starting below
+  // it. `black-translucent` would look sleeker but draws the page
+  // *under* the status bar, so the inbox header would sit beneath the
+  // clock and notch until every screen handles safe-area insets —
+  // that's a separate piece of work, not a metadata flag.
+  appleWebApp: {
+    capable: true,
+    title: "wacrm",
+    statusBarStyle: "default",
   },
   formatDetection: {
     email: false,
