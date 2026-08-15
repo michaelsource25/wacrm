@@ -228,3 +228,29 @@ html[data-theme="rose"] {
     @apply font-sans;
   }
 }
+
+/* ------------------------------------------------------------
+   Stop iOS Safari from zooming on focus.
+
+   Safari zooms the viewport whenever you focus a control whose text is
+   smaller than 16px — and most of ours are `text-sm` (14px), so every
+   tap on the inbox composer jolts the layout and leaves the page
+   scaled. Raising controls to 16px on small screens removes the
+   trigger while keeping pinch-zoom available.
+
+   The other common "fix", `maximum-scale=1` / `user-scalable=no` on
+   the viewport meta, is deliberately NOT used: Safari ignores it for
+   accessibility, and where it is honoured it takes zoom away from
+   users who need it.
+
+   Unlayered on purpose — layered styles always lose to unlayered ones
+   in the cascade, so this beats Tailwind's `text-sm` utility without
+   needing `!important`.
+   ------------------------------------------------------------ */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
