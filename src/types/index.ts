@@ -406,6 +406,37 @@ export interface Service {
   updated_at: string;
 }
 
+export type OrderStatus = 'pending' | 'confirmed' | 'delivered' | 'cancelled';
+
+/** One line of an order (migration 043). `product_name` / `unit_price`
+ *  are snapshotted when the line is added, so a later catalog edit
+ *  never rewrites what the customer agreed to. */
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  product_id: string | null;
+  product_name: string;
+  unit_price: number;
+  quantity: number;
+  created_at: string;
+}
+
+/** An order taken over WhatsApp (migration 043). `total` is
+ *  maintained by a DB trigger from the items — never written directly. */
+export interface Order {
+  id: string;
+  account_id: string;
+  contact_id: string | null;
+  status: OrderStatus;
+  total: number;
+  currency?: string | null;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+  contact?: { id: string; name: string | null; phone: string } | null;
+  items?: OrderItem[];
+}
+
 /** Catalog item (migration 041). `image_url` is a public
  *  product-media URL Meta fetches when the bot sends the photo. */
 export interface Product {

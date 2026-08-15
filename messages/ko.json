@@ -23,6 +23,7 @@
     "pipelines": "파이프라인",
     "appointments": "예약",
     "products": "제품",
+    "orders": "주문",
     "broadcasts": "브로드캐스트",
     "automations": "자동화",
     "flows": "플로우",
@@ -50,6 +51,7 @@
     "pipelines": "파이프라인",
     "appointments": "예약",
     "products": "제품",
+    "orders": "주문",
     "broadcasts": "브로드캐스트",
     "automations": "자동화",
     "settings": "설정",
@@ -161,6 +163,42 @@
       "uploadFailed": "사진을 업로드할 수 없습니다",
       "imageTooLarge": "이미지가 너무 큽니다 (최대 5MB)",
       "invalidPrice": "유효한 가격을 입력하세요"
+    }
+  },
+  "Orders": {
+    "title": "주문",
+    "description": "어시스턴트가 WhatsApp에서 받은 주문입니다. 가격과 합계는 카탈로그에서 가져옵니다.",
+    "emptyTitle": "주문이 없습니다",
+    "emptyBody": "고객이 WhatsApp에서 카탈로그의 제품을 주문하면 합계와 함께 여기에 표시됩니다.",
+    "noContact": "삭제된 연락처",
+    "contact": "전화번호",
+    "statusLabel": "상태",
+    "total": "합계",
+    "itemCount": "{count, plural, =0 {품목 없음} other {품목 #개}}",
+    "filters": {
+      "active": "진행 중",
+      "pending": "장바구니",
+      "confirmed": "확정됨",
+      "delivered": "전달됨",
+      "cancelled": "취소됨"
+    },
+    "status": {
+      "pending": "장바구니",
+      "confirmed": "확정됨",
+      "delivered": "전달됨",
+      "cancelled": "취소됨"
+    },
+    "actions": {
+      "confirmed": "확정",
+      "delivered": "전달 완료",
+      "cancelled": "주문 취소",
+      "delete": "삭제"
+    },
+    "toasts": {
+      "updated": "주문이 업데이트되었습니다",
+      "deleted": "주문이 삭제되었습니다",
+      "updateFailed": "주문을 업데이트할 수 없습니다",
+      "deleteFailed": "주문을 삭제할 수 없습니다"
     }
   },
   "Dashboard": {

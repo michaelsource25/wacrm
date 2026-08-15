@@ -6,6 +6,7 @@ import { generateReply } from './generate'
 import { buildSystemPrompt } from './defaults'
 import { buildAppointmentTools } from './tools/appointments'
 import { buildProductTools } from './tools/products'
+import { buildOrderTools } from './tools/orders'
 import { buildHandoffSummary } from './handoff'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
@@ -197,7 +198,11 @@ export async function dispatchInboundToAiReply(
     // so a generalist support bot stays generalist. A capability that
     // fails to load must never silence the whole bot, so each degrades
     // to "not offered" and the reply goes out without it.
-    const [knowledge, booking, catalog] = await Promise.all([
+    // Shared by the catalog and order capabilities, so prices and
+    // totals are quoted in one unit.
+    const currency = await accountCurrency(db, accountId)
+
+    const [knowledge, booking, catalog, ordering] = await Promise.all([
       retrieveKnowledge(db, accountId, config, latestUserMessage(messages)),
       buildAppointmentTools(db, { accountId, contactId }).catch((err) => {
         console.error('[ai auto-reply] appointment tools unavailable:', err)
@@ -208,17 +213,27 @@ export async function dispatchInboundToAiReply(
         conversationId,
         contactId,
         configOwnerUserId,
-        currency: await accountCurrency(db, accountId),
+        currency,
       }).catch((err) => {
         console.error('[ai auto-reply] product tools unavailable:', err)
         return null
       }),
+      buildOrderTools(db, { accountId, contactId, currency }).catch((err) => {
+        console.error('[ai auto-reply] order tools unavailable:', err)
+        return null
+      }),
     ])
 
-    const capabilities = [booking?.prompt, catalog?.prompt].filter(
-      (p): p is string => !!p,
-    )
-    const tools = [...(booking?.tools ?? []), ...(catalog?.tools ?? [])]
+    const capabilities = [
+      booking?.prompt,
+      catalog?.prompt,
+      ordering?.prompt,
+    ].filter((p): p is string => !!p)
+    const tools = [
+      ...(booking?.tools ?? []),
+      ...(catalog?.tools ?? []),
+      ...(ordering?.tools ?? []),
+    ]
 
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,

@@ -23,6 +23,7 @@
     "pipelines": "Pipelines",
     "appointments": "Appointments",
     "products": "Products",
+    "orders": "Orders",
     "broadcasts": "Broadcasts",
     "automations": "Automations",
     "flows": "Flows",
@@ -50,6 +51,7 @@
     "pipelines": "Pipelines",
     "appointments": "Appointments",
     "products": "Products",
+    "orders": "Orders",
     "broadcasts": "Broadcasts",
     "automations": "Automations",
     "settings": "Settings",
@@ -161,6 +163,42 @@
       "uploadFailed": "Could not upload the photo",
       "imageTooLarge": "The image is too large (max 5 MB)",
       "invalidPrice": "Enter a valid price"
+    }
+  },
+  "Orders": {
+    "title": "Orders",
+    "description": "Orders the assistant took over WhatsApp. Prices and totals come from your catalog.",
+    "emptyTitle": "No orders here",
+    "emptyBody": "When a customer orders from your catalog on WhatsApp, the order shows up here with its total.",
+    "noContact": "Deleted contact",
+    "contact": "Phone",
+    "statusLabel": "Status",
+    "total": "Total",
+    "itemCount": "{count, plural, =0 {no items} =1 {1 item} other {# items}}",
+    "filters": {
+      "active": "Active",
+      "pending": "Cart",
+      "confirmed": "Confirmed",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled"
+    },
+    "status": {
+      "pending": "Cart",
+      "confirmed": "Confirmed",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled"
+    },
+    "actions": {
+      "confirmed": "Confirm",
+      "delivered": "Mark delivered",
+      "cancelled": "Cancel order",
+      "delete": "Delete"
+    },
+    "toasts": {
+      "updated": "Order updated",
+      "deleted": "Order deleted",
+      "updateFailed": "Could not update the order",
+      "deleteFailed": "Could not delete the order"
     }
   },
   "Dashboard": {
