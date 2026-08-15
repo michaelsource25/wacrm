@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
+import { avatarColorClass, contactInitials } from "@/lib/contacts/avatar";
 import type { Contact, Deal, ContactNote, Tag } from "@/types";
 import {
   Phone,
@@ -128,7 +129,7 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
   }
 
   const displayName = contact.name || contact.phone;
-  const initials = displayName.charAt(0).toUpperCase();
+  const initials = contactInitials(displayName);
 
   return (
     <div className="flex h-full w-70 flex-col border-l border-border bg-card">
@@ -136,7 +137,14 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
         <div className="p-4">
           {/* Contact Info */}
           <div className="flex flex-col items-center text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-lg font-semibold text-foreground">
+            <div
+              className={cn(
+                "flex h-16 w-16 items-center justify-center rounded-full text-lg font-semibold",
+                contact.avatar_url
+                  ? "bg-muted text-foreground"
+                  : `${avatarColorClass(contact.id)} text-white`,
+              )}
+            >
               {contact.avatar_url ? (
                 <img
                   src={contact.avatar_url}

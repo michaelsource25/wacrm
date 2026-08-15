@@ -7,6 +7,7 @@ import { usePresence } from "@/hooks/use-presence";
 import { PresenceDot } from "@/components/presence/presence-dot";
 import { presenceLabel } from "@/lib/presence";
 import { cn } from "@/lib/utils";
+import { avatarColorClass, contactInitials } from "@/lib/contacts/avatar";
 import type {
   Conversation,
   Message,
@@ -894,8 +895,24 @@ export function MessageThread({
               <ArrowLeft className="h-5 w-5" />
             </button>
           )}
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
-            {displayName.charAt(0).toUpperCase()}
+          <div
+            className={cn(
+              "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-medium",
+              contact.avatar_url
+                ? "bg-muted text-foreground"
+                : `${avatarColorClass(contact.id)} text-white`,
+            )}
+          >
+            {contact.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={contact.avatar_url}
+                alt={displayName}
+                className="h-9 w-9 rounded-full object-cover"
+              />
+            ) : (
+              contactInitials(displayName)
+            )}
           </div>
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold text-foreground">{displayName}</h2>

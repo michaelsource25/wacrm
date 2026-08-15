@@ -8,6 +8,7 @@ import {
   normalizeConversations,
 } from "@/lib/inbox/conversations";
 import { cn } from "@/lib/utils";
+import { avatarColorClass, contactInitials } from "@/lib/contacts/avatar";
 import type { Conversation, ConversationStatus, Tag } from "@/types";
 import { Search, ChevronDown, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -438,7 +439,7 @@ function ConversationItem({
 }: ConversationItemProps) {
   const contact = conversation.contact;
   const displayName = contact?.name || contact?.phone || t("unknown");
-  const initials = displayName.charAt(0).toUpperCase();
+  const initials = contactInitials(displayName);
 
   const handleClick = useCallback(() => {
     onSelect(conversation);
@@ -459,7 +460,14 @@ function ConversationItem({
       )}
     >
       {/* Avatar */}
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
+      <div
+        className={cn(
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-medium",
+          contact?.avatar_url
+            ? "bg-muted text-foreground"
+            : `${avatarColorClass(contact?.id)} text-white`,
+        )}
+      >
         {contact?.avatar_url ? (
           <img
             src={contact.avatar_url}
